@@ -34,3 +34,58 @@ test("guard owns the conversation an ask tool starts, not the citations it retur
   assert.equal(guard.check(ask, { conversation_id: "cnv_abcdefghjk23" }), null);
   assert.match(guard.check({ name: "delete_resource" }, { resource_id: "res_aaaaaaaaaaaa" }), /did not create/);
 });
+
+test("budget and step cutoffs identify the test harness so skipped cleanup is not blamed on the product", async () => {
+  const { scriptedGateway, call } = await import("./helpers.mjs");
+  const { runAgent } = await import("../lib/agent.mjs");
+
+  const surface = {
+    kind: "mcp",
+    label: "MCP server",
+    blurb: "Use MCP tools.",
+    coverageNoun: "tool",
+    tools: [{ name: "ping", description: "Ping", inputSchema: { type: "object", properties: {} } }],
+    limitKey: (name) => name,
+    check: () => null,
+    call: async () => ({ text: '{"ok":true}', isError: false }),
+    record: () => {},
+    coverageKey: (name) => name,
+  };
+
+  // Budget cap: scriptedGateway charges 0.001 per turn, so maxCostUsd: 0.001 stops after turn 1.
+  const budgetGw = await scriptedGateway([
+    call("1", "ping", {}),
+    { content: "## Score\n9/10." },
+  ]);
+  const budgetRun = await runAgent({
+    surface,
+    target: {},
+    mission: "Test {{surface}}.",
+    model: "fake/model",
+    maxCostUsd: 0.001,
+    maxSteps: 5,
+  });
+  assert.equal(budgetRun.stoppedBy, "budget");
+  const budgetFinalMessages = budgetGw.requests.at(-1).messages;
+  assert.match(budgetFinalMessages[0].content, /test budget or step cap/);
+  assert.match(budgetFinalMessages.at(-1).content, /\[harness\] Session budget cap reached/);
+  assert.match(budgetFinalMessages.at(-1).content, /do not report skipped cleanup/i);
+  budgetGw.server.close();
+
+  // Step cap: maxSteps: 1 stops after 1 tool-calling turn.
+  const stepGw = await scriptedGateway([
+    call("1", "ping", {}),
+    { content: "## Score\n9/10." },
+  ]);
+  const stepRun = await runAgent({
+    surface,
+    target: {},
+    mission: "Test {{surface}}.",
+    model: "fake/model",
+    maxCostUsd: 1,
+    maxSteps: 1,
+  });
+  assert.equal(stepRun.stoppedBy, "steps");
+  assert.match(stepGw.requests.at(-1).messages.at(-1).content, /\[harness\] Session step cap reached/);
+  stepGw.server.close();
+});
