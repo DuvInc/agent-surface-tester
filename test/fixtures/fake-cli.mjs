@@ -6,7 +6,7 @@ else if (cmd === "things" && sub === "rename") console.log(JSON.stringify({ rena
 else if (cmd === "env") console.log(JSON.stringify({
   key: process.env.FAKE_KEY === "cli-secret" ? "set" : "missing",
   leaked: process.env.SHOULD_NOT_LEAK ?? null,
-  homeIsScratch: process.env.HOME?.includes("mcp-agent-tester-cli-"),
-  cwdIsScratch: process.cwd().includes("mcp-agent-tester-cli-"),
+  homeIsScratch: process.env.HOME?.includes("agent-surface-tester-cli-"),
+  cwdIsScratch: process.cwd().includes("agent-surface-tester-cli-"),
 }));
 else { console.error("unknown command"); process.exit(2); }

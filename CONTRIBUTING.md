@@ -38,10 +38,10 @@ in them exists because something went wrong: a model that renamed an object it h
 created, a server that answers in Server-Sent Events, a gateway that returns HTTP 200 with an
 error in the body. Add the case to `test/`.
 
-**The purity boundary holds.** `lib/openrouter.mjs` is the only file that reads a model key
-and `lib/mcp-client.mjs` the only one that talks to the server under test. Everything else
-takes its input as an argument. A change that reads `process.env` elsewhere in `lib/` makes
-the library harder to embed and the tests harder to trust.
+**The purity boundary holds.** `lib/openrouter.mjs` is the only file that reads a model key,
+and `lib/mcp-client.mjs` plus `lib/surfaces/` are the only files that talk to the product
+under test. Everything else takes its input as an argument. A change that reads `process.env`
+elsewhere in `lib/` makes the library harder to embed and the tests harder to trust.
 
 **The tester stays unbiased.** The system prompt describes the setup and the report format,
 never an opinion about any server. A change that nudges the agent toward a verdict is a

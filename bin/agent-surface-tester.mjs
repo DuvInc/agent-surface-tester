@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// mcp-agent-tester tools|run|cleanup|suite ...   (see USAGE)
+// agent-surface-tester tools|run|cleanup|suite ...   (see USAGE)
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { parseArgs } from "node:util";
@@ -11,13 +11,13 @@ import { createSurface } from "../lib/surfaces/index.mjs";
 import { acquireLock, lockKey } from "../lib/lock.mjs";
 
 const USAGE = `Usage:
-  mcp-agent-tester tools    --target <target.json>
-  mcp-agent-tester run      --target <target.json> --mission <mission.md> [--model <id>] [--flex] [--reasoning low]
-                            [--max-steps 40] [--max-cost 0.05] [--key-from-clipboard] [--wait-lock <seconds>] [--no-cleanup] [--out reports]
-  mcp-agent-tester cleanup  --target <target.json> [--dry]
-  mcp-agent-tester suite    --suite <suite.json> [--out reports]
+  agent-surface-tester tools    --target <target.json>
+  agent-surface-tester run      --target <target.json> --mission <mission.md> [--model <id>] [--flex] [--reasoning low]
+                                [--max-steps 40] [--max-cost 0.05] [--key-from-clipboard] [--wait-lock <seconds>] [--no-cleanup] [--out reports]
+  agent-surface-tester cleanup  --target <target.json> [--dry]
+  agent-surface-tester suite    --suite <suite.json> [--out reports]
 
-A target has a "surface": "mcp" (default), "api" or "cli". One agent per surface per run, one run at a time per workspace.`;
+A target has a "surface": "mcp" (default), "api", "cli" or "sdk". One agent per surface per run, one run at a time per workspace.`;
 
 const [command, ...rest] = process.argv.slice(2);
 const { values: o } = parseArgs({

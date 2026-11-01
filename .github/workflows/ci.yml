@@ -27,4 +27,4 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: npm test
-      - run: node --check bin/mcp-agent-tester.mjs
+      - run: node --check bin/agent-surface-tester.mjs

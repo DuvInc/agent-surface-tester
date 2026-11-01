@@ -1,13 +1,15 @@
-# mcp-agent-tester
+# agent-surface-tester
 
-**You built an MCP server, a REST API and a CLI for agents. Have you watched an agent use them?**
+![agent-surface-tester: a dithered banner with the project name and its one-line summary](docs/hero.png)
 
-This runs a cheap AI agent that has never seen your product, gives it **one surface** (your MCP tools, or your REST API and its documentation, or your command line), a plain mission and a hard budget, and writes down what it did and what it thought: what was obvious, what it had to guess, what broke, what it expected to work differently. The agent is the user your tool descriptions, your OpenAPI file and your `--help` were written for.
+**You built an MCP server, a REST API, a CLI or an SDK for agents. Have you watched an agent use them?**
+
+This runs a cheap AI agent that has never seen your product, gives it **one door** (your MCP tools, your REST API and its documentation, your command line, or your client SDK), a plain mission and a hard budget, and writes down what it did and what it thought: what was obvious, what it had to guess, what broke, what it expected to work differently. The agent is the user your tool descriptions, your OpenAPI file, your `--help` and your type definitions were written for.
 
 ```bash
 cp targets/example.json targets/my-server.json     # URL, how to authenticate, one sentence of context
-node --env-file=.env bin/mcp-agent-tester.mjs tools --target targets/my-server.json
-node --env-file=.env bin/mcp-agent-tester.mjs run    --target targets/my-server.json \
+node --env-file=.env bin/agent-surface-tester.mjs tools --target targets/my-server.json
+node --env-file=.env bin/agent-surface-tester.mjs run   --target targets/my-server.json \
   --mission missions/full-tour.md --model openai/gpt-6-luna --flex --max-cost 0.05
 # MCP server: my-server 1.0.0, 48 tools
 # · get_account {}  (212 ms)
@@ -17,31 +19,32 @@ node --env-file=.env bin/mcp-agent-tester.mjs run    --target targets/my-server.
 # Report: reports/2026-11-01-11-57-02_mcp_full-tour_openai-gpt-6-luna.md
 ```
 
-The report has a score out of 10, what worked, friction with a severity, missing behaviour, coverage, unclear descriptions and "what would make it a 10". Next to it sits the trace of every call, with duration, outcome, and the coverage the harness measured itself (how many distinct tools, endpoints or commands were actually used).
+The report has a score out of 10, what worked, friction with a severity, missing behaviour, coverage, unclear descriptions and "what would make it a 10". Next to it sits the trace of every call, with duration, outcome, and the coverage the harness measured itself (how many distinct tools, operations, commands or methods were actually used).
 
-## Three surfaces, one agent each
+## Four doors, one agent each
 
-| Surface | What the agent gets | How it learns the product |
+| Door | What the agent gets | How it learns the product |
 | :--- | :--- | :--- |
 | `mcp` | The tools the server lists, as they are, annotations included | The tool descriptions, which is all a model has |
 | `api` | `http_request` (base URL fixed, credential added by the harness) and `read_docs` (GET on the doc hosts you list, in windows of 12,000 characters) | `llms.txt`, the OpenAPI file, your guides: it has to find its way, as a real agent does |
 | `cli` | `run_cli` (an argument array, no shell), `write_file` and `read_file` in a scratch folder | `--help`, the output of the tool, its error messages |
+| `sdk` | `run_code` (Node.js ESM in a scratch folder with your package linked), `read_docs`, `write_file`, `read_file` | Exported methods, `.d.ts` declarations, README and guides |
 
-One surface per run, on purpose. An agent that can use the MCP, the API and the CLI mixes them and you learn about none. Run the same mission on each surface to see which door agents take most easily.
+One door per run, on purpose. An agent that can reach the MCP, the API, the CLI and the SDK at once mixes them and you learn about none. Run the same mission on each door to see where agents sail through and where they guess wrong.
 
 ## What it cost, measured
 
-Run against a SaaS with three surfaces (48 MCP tools, 46 REST paths, 70 CLI commands), on 2026-11-01. 44 runs, 1,287 tool calls, $0.048 in total. Same full-tour mission on each surface with a small model on the flex tier:
+Tested across 8 campaigns on a production SaaS (48 MCP tools, 46 REST paths, 70 CLI commands, 1 client SDK): **89 runs, $0.125 in total** on OpenRouter. Same full-tour mission on MCP, REST API and CLI with a small model on the flex tier:
 
-| Surface | Tool calls | Measured coverage | Cost |
+| Interface | Tool calls | Measured coverage | Cost |
 | :--- | ---: | :--- | ---: |
 | MCP | 58 | 44 of 48 tools | $0.0066 |
 | REST API | 52 | 40 distinct operations | $0.0061 |
 | CLI | 29 | 27 distinct commands | $0.0020 |
 
-The CLI costs a third because the model sees 3 tools, where the MCP surface hands it 48 tool schemas on every step. Free (`:free`) models cost nothing but are the least reliable part: 13 of 44 runs ended early on a provider error (a per-minute 429 when three runs share the key, "temporarily overloaded", an idle timeout). The report is still written, with the trace up to that point.
+The CLI costs a third because the model sees 3 tools, whereas the MCP server hands it 48 tool schemas on every step. Free (`:free`) models cost nothing and bring variety, though providers cut some runs short under rate limits or load; the harness still writes the report and the trace up to that step.
 
-What the comparison across surfaces found that no single surface showed: the same empty text returns a clear 400 on the REST API and a 500 `internal_error` on the MCP server.
+Comparing doors exposed bugs that no single door showed: sending empty text returned a clean 400 `invalid_parameter` on the REST API and a 500 `internal_error` on the MCP server. Four out of four API agents guessed `content` instead of `text` because `llms.txt` lacked a copyable request body. Five out of five hit a plan cap labelled `feature_not_available` instead of a quantity limit. Fixing those dropped errors on the local API tour from 9 to 0.
 
 ## How it works
 
@@ -52,68 +55,68 @@ mission.md ──► agent loop ◄──► any tool-calling model (OpenRouter,
                   ├─ ownership guard: may only change what it created this session      (hard)
                   ├─ one run at a time per workspace (lock keyed on the credential)     (hard)
                   ▼
-        surface: MCP client │ HTTP tool + docs reader │ CLI in a scratch directory
+        door: MCP client │ HTTP tool + docs reader │ CLI in scratch dir │ Node.js SDK runner
                   │
-                  └─► report.md + trace.json
+                  └──► report.md + trace.json
 ```
 
 Decisions, and what was rejected:
 
 - **One agent per run, one neutral system prompt.** The prompt describes the setup and the report format, nothing about your product beyond a sentence you write. A tester that has been told what you worry about finds it.
-- **The harness enforces the rules, the prompt informs.** The first free model tested renamed and paused an object it had not created, in spite of "only change what you created" in its instructions. `lib/ownership.mjs` remembers the ids that creating operations returned and refuses any other call that changes an id it does not know. On HTTP and CLI the same guard reads the path and the arguments. The harness also adds the credential itself, so the model never sees it.
-- **One agent per workspace.** Two agents in the same workspace read each other's objects, rename them and delete them, and the feedback becomes about the collision. `lib/lock.mjs` refuses a second run on a credential that is already in use (a crashed run does not block anyone: a lock whose process is gone is taken over). To test three surfaces at once, give each its own workspace and its own key: `suite` runs them in parallel and queues runs that share a workspace.
-- **The CLI is isolated from the inside out.** Arguments are an array, so there is no shell, no pipe and no expansion. The environment is rebuilt from nothing: `PATH`, a fake `HOME` in the scratch folder, the credential in the one variable the tool reads. The working folder is a fresh temp folder, deleted at the end. Each call has a timeout and an output cap, and you can deny subcommands. That is a boundary against a confused model, not against a hostile one: for that, run the whole thing in a container.
+- **The harness enforces the rules, the prompt informs.** The first free model tested renamed and paused an object it had not created, in spite of "only change what you created" in its instructions. `lib/ownership.mjs` remembers the ids that creating operations returned and refuses any mutating call that names an id it does not know. On HTTP, CLI and SDK the same guard checks paths, arguments and script source (on SDK, treat that as a rail against a mistaken model rather than a sandbox against hostile code). The harness also injects the credential itself, so the model never sees it.
+- **One agent per workspace.** Two agents in the same workspace read each other's objects, rename them and delete them, and the feedback becomes about the collision. `lib/lock.mjs` refuses a second run on a credential that is already in use (a crashed run does not block anyone: a lock whose process is gone is taken over). To test several doors at once, give each its own workspace and its own key: `suite` runs them in parallel and queues runs that share a workspace.
+- **The CLI and SDK are isolated from the inside out.** Commands and scripts run in a fresh temp directory deleted at the end, with scrubbed environments, output caps and execution timeouts. For untrusted code, run inside a container.
 - **Clean workspace, every run.** A run starts and ends by deleting what carries the test prefix. Without it, agents found a previous agent's leftovers, could not tell whose they were, and refused to touch them.
 - **Cheap models, several of them.** A full tour is about 300k input tokens. On a small model on the flex tier that is half a cent. Free models cost nothing and add diversity. One model's opinion is a hypothesis; the same point from three models is a signal.
-- **No dependency, no cloud account.** The MCP client is 90 lines of `fetch`. It speaks the Streamable HTTP transport, reads JSON or Server-Sent Events answers, and does not need a session. Everything runs on your machine; it needs a model key and a credential for the product, nothing else.
+- **Zero npm dependencies.** Built on Node 22 standard modules (`node:fs`, `node:child_process`, `node:test`, native `fetch`). Everything runs on your machine; it needs a model key and a credential for the product, nothing else.
 
 ## Feedback is input, not a verdict
 
 Treat every report as one user's view.
 
-- Models disagree. In the runs above, one said a response lacked a field that another had just shown. Verify a claim against the server before acting on it.
+- Models disagree. In real runs, one claimed a response lacked a field that another had just logged. Verify a claim against the server before acting on it.
 - Models flatter. Scores of 7 to 9 out of 10 came with real defects named inside. Read the friction list, not the score.
 - Weak models misread the harness as the server's fault. The prompt says not to; some do anyway.
-- What your server should do is your decision. An agent that finds a tool confusing tells you about the description, not about the product.
+- What your product should do is your decision. Four agents asked for a blocking `--wait` flag on a CLI whose rule is one HTTP request per command; we kept the rule and clarified the status output instead.
 
 ## Try it locally
 
 ```bash
-git clone https://github.com/DuvInc/mcp-agent-tester && cd mcp-agent-tester
+git clone https://github.com/DuvInc/agent-surface-tester && cd agent-surface-tester
 npm test                      # no network, no key: fake servers and a fake model gateway on localhost
-cp .env.example .env          # OPENROUTER_API_KEY, and the credential of the server you test
+cp .env.example .env          # OPENROUTER_API_KEY, and the credential of the product you test
 ```
 
-Without a key, `npm test` still runs the whole loop against fakes.
+Without a key, `npm test` still runs the whole loop across all four doors against fakes.
 
-## Authentication, honestly
+## Giving the agent a credential
 
-| How the server wants you to sign in | Supported | How |
-| :--- | :--- | :--- |
-| An API key you create | yes | `"auth": {"type": "bearer", "env": "MY_KEY"}`, or `--key-from-clipboard` after you copy it |
-| OAuth | not directly | Create a key instead if the server offers one. Otherwise do the flow yourself and pass the access token as `bearer` |
-| The agent signs up and creates its own account | no, on purpose | Most products forbid automated signups, and an account in production is a cost nobody asked for |
+An agent needs a credential to use your product, and building browser signup automation is a distraction from testing the interface itself. Five simple ways cover almost every setup:
 
-Use a key made for the test, with the narrowest scopes, on a workspace that holds nothing real, and revoke it afterwards.
+1. **An environment variable.** Create a scoped test API key, set it in `.env`, and point `"auth": { "type": "bearer", "env": "MY_SERVER_API_KEY" }` at it. The harness adds the header or child variable; the model never sees the token.
+2. **A local disposable sandbox.** Start your product locally (Docker, Miniflare, SQLite) and seed three or four empty workspaces with test keys in SQL. Agents can create, break and delete things at zero cost and zero risk to real data.
+3. **A setup script that mints and revokes a key.** If your backend has an admin CLI or migration script, wrap the run in a short shell script that creates a temporary workspace key before `suite` and deletes it right after.
+4. **Clipboard hand-off (`--key-from-clipboard`).** Copy a fresh key from your dashboard and pass `--key-from-clipboard` for a one-off run without writing the token to disk.
+5. **An OAuth helper.** If your server only speaks OAuth, complete the login once yourself (or exchange a refresh token in a local script) and pass the short-lived access token through an environment variable.
 
 ## Putting it in your product
 
-1. **A sandbox workspace per surface.** Create a separate workspace (or account, or project) for each surface you test, with its own test credential, the narrowest scopes that let the agent work, and some credit. Nothing real in it. Revoke the keys when you are done.
-2. **A target file per surface** (`targets/example.json`, `example-api.json`, `example-cli.json`): `surface`, how to authenticate, a `context` sentence, `rules`, `limits` on everything that spends money or imports from the internet, `ownership` rules that say which operations create things, and a `cleanup` section.
+1. **A sandbox workspace per door.** Create a separate workspace (or run a local instance) for each interface you test, with its own test credential, narrow scopes and a small credit balance. Nothing real in it. Revoke production keys when you are done.
+2. **A target file per door** (`targets/example.json`, `example-api.json`, `example-cli.json`, `example-sdk.json`): `surface`, how to authenticate, a `context` sentence, `rules`, `limits` on everything that spends money or imports from the internet, `ownership` rules that say which operations create things, and a `cleanup` section.
 3. **Missions** are plain Markdown with `{{surface}}` filled in: `first-use`, `full-tour`, `edge-cases` (errors), `docs-vs-reality` (every claim in the documentation checked against the product), `boundaries` (what the credential may and may not do, and how clearly it says so). A prompt you gave to a chat assistant makes a good mission as it is.
-4. **A suite** (`suites/example.json`) lists runs: surface, mission, model, budget. `mcp-agent-tester suite --suite suites/my.json` runs them, three at a time across workspaces.
-5. **After a crashed run**, `cleanup` deletes everything whose name starts with the `cleanup.prefix` (default `mcp-test-`), through an MCP endpoint of the same workspace.
+4. **A suite** (`suites/example.json`) lists runs: target, mission, model, budget. `agent-surface-tester suite --suite suites/my.json` runs them, in parallel across workspaces.
+5. **After a crashed run**, `cleanup` deletes everything whose name starts with `cleanup.prefix` (default `mcp-test-`), through an MCP endpoint of the same workspace.
 
 The model contract, if you want another provider, is one function: `chat(body, { flex })` in `lib/openrouter.mjs`, which takes an OpenAI-style chat-completions body with `tools` and returns `{ message, usage, cost, tier }`. Any OpenAI-compatible gateway works with `LLM_BASE_URL` and `LLM_API_KEY`; cost reporting and the flex tier are OpenRouter features.
 
-If you use a coding agent, [skills/test-an-mcp-server](skills/test-an-mcp-server/SKILL.md) is the procedure written for it.
+If you use a coding agent, [skills/agent-surface-tester](skills/agent-surface-tester/SKILL.md) is the procedure written for it.
 
 ## What this is not
 
 - **Not a test suite.** It finds what an agent finds confusing, not whether your server returns the right bytes. Keep your own tests.
-- **Not a benchmark.** Forty-four runs on one product say nothing about how models rank.
+- **Not a benchmark.** Runs on one product say nothing about how models rank in general.
 - **Not safe on real data.** The guard stops a mistaken model from changing what it did not create. It does not stop it from reading, and it does not make an admin key safe to hand over.
-- **Not OAuth, not browsers, not stdio servers.** Remote MCP servers over HTTP, REST over HTTPS and local command line tools, for now. No SDK surface yet.
+- **Not OAuth, not browsers, not stdio servers.** Remote MCP servers over HTTP, REST over HTTPS, local command line tools, and Node.js client SDKs.
 - **Not an attack tool.** The `boundaries` mission checks that refusals are clear. It does not try to get around anything.
 - **Not a judge of your product.** Agents tell you how it feels to use. Whether to change it is yours to decide.
 

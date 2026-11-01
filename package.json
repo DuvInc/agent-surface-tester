@@ -1,15 +1,15 @@
 {
-  "name": "mcp-agent-tester",
+  "name": "agent-surface-tester",
   "type": "module",
   "version": "0.1.0",
   "private": true,
-  "description": "Let a cheap, unbiased AI agent use your MCP server, REST API or command line tool and report what felt wrong. One agent per surface, any model on OpenRouter, hard budgets, a guard that keeps it away from data it did not create, one agent per workspace.",
+  "description": "Let a cheap, unbiased AI agent use your MCP server, REST API, CLI or SDK and report what felt wrong. One agent per surface, any model on OpenRouter, hard budgets, a guard that keeps it away from data it did not create, one agent per workspace.",
   "license": "MIT",
   "engines": {
     "node": ">=22.18.0"
   },
   "bin": {
-    "mcp-agent-tester": "./bin/mcp-agent-tester.mjs"
+    "agent-surface-tester": "./bin/agent-surface-tester.mjs"
   },
   "exports": {
     ".": "./lib/agent.mjs",
@@ -20,8 +20,8 @@
     "./lock": "./lib/lock.mjs"
   },
   "scripts": {
-    "tools": "node bin/mcp-agent-tester.mjs tools",
-    "run": "node bin/mcp-agent-tester.mjs run",
+    "tools": "node bin/agent-surface-tester.mjs tools",
+    "run": "node bin/agent-surface-tester.mjs run",
     "test": "node --test --test-force-exit test/*.test.mjs"
   }
 }

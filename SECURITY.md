@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Please report privately rather than in a public issue, using GitHub's
-[private vulnerability reporting](https://github.com/DuvInc/mcp-agent-tester/security/advisories/new)
+[private vulnerability reporting](https://github.com/DuvInc/agent-surface-tester/security/advisories/new)
 on this repository.
 
 This is a one-person project. You should get an acknowledgement within a few
@@ -12,8 +12,8 @@ issue that says only that you are waiting on a private report, with no details.
 
 ## What is in scope
 
-This tool lets a language model call the tools of an MCP server with a credential you
-provide. The surface that matters:
+This tool lets a language model call your MCP server, REST API, CLI or client SDK with a
+credential you provide. What matters:
 
 - **Key handling.** Anything that causes `OPENROUTER_API_KEY` or the credential of the server
   under test to be printed, written to a report or a tracked file, shown to the model, or sent

@@ -1,0 +1,34 @@
+{
+  "name": "My SDK",
+  "surface": "sdk",
+  "auth": {
+    "type": "bearer",
+    "env": "MY_SERVER_API_KEY"
+  },
+  "context": "One or two sentences on what the product does, as the agent should know it before it starts.",
+  "rules": [
+    "Prefix the name or title of everything you create with \"mcp-test-\"."
+  ],
+  "sdk": {
+    "package": "@my-org/sdk",
+    "path": "./node_modules/@my-org/sdk",
+    "credentialEnv": "MY_ORG_API_KEY",
+    "docs": ["README.md", "dist/index.d.ts"],
+    "docsHosts": ["docs.example.com"]
+  },
+  "limits": {
+    "client\\.ask": 10
+  },
+  "ownership": {
+    "rules": [
+      { "match": "\\.create\\s*\\(", "ids": "^(thing|item)_" }
+    ]
+  },
+  "cleanup": {
+    "url": "https://example.com/mcp",
+    "prefix": "mcp-test-",
+    "steps": [
+      { "list": "list_things", "delete": "delete_thing", "idArg": "thing_id", "nameField": "name" }
+    ]
+  }
+}
