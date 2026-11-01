@@ -1,0 +1,36 @@
+name: Bug report
+description: Something does not work the way this repository says it does.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: lines
+    attributes:
+      label: The relevant lines of the report or trace
+      description: >
+        The few lines around the problem are usually enough. Replace anything
+        that identifies a person or a customer. Never attach a full report from
+        a server you do not own.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Commit, Node version, model ids
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before filing
+      options:
+        - label: My paste contains no API key.
+          required: true
+        - label: My paste contains no personal data or customer content.
+          required: true

@@ -1,0 +1,7 @@
+node_modules
+.env
+.env.*
+!.env.example
+# Reports hold what a server answered to a test: read them, keep what you learn, not the file.
+reports/
+.claude/

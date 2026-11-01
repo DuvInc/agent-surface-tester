@@ -1,0 +1,30 @@
+name: CI
+
+# Pull requests only get the default read-only token, and nothing here needs
+# more. No secret is referenced, and `pull_request` (never
+# `pull_request_target`) means a fork's code cannot reach one.
+#
+# What CI does NOT do: talk to a model or to a real MCP server. Both need keys and one costs
+# money. The end-to-end test runs against a fake server and a fake model gateway on localhost.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - run: npm test
+      - run: node --check bin/mcp-agent-tester.mjs

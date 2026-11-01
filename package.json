@@ -1,0 +1,21 @@
+{
+  "name": "mcp-agent-tester",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Let a cheap, unbiased AI agent use your MCP server and tell you what felt wrong. One agent per run, any model on OpenRouter, a hard budget, a guard that keeps it away from data it did not create.",
+  "license": "MIT",
+  "engines": { "node": ">=22.18.0" },
+  "bin": { "mcp-agent-tester": "./bin/mcp-agent-tester.mjs" },
+  "exports": {
+    ".": "./lib/agent.mjs",
+    "./client": "./lib/mcp-client.mjs",
+    "./ownership": "./lib/ownership.mjs",
+    "./openrouter": "./lib/openrouter.mjs"
+  },
+  "scripts": {
+    "tools": "node bin/mcp-agent-tester.mjs tools",
+    "run": "node bin/mcp-agent-tester.mjs run",
+    "test": "node --test test/*.test.mjs"
+  }
+}
