@@ -1,18 +1,34 @@
 {
   "name": "My product",
+  "surface": "mcp",
   "url": "https://example.com/mcp",
-  "auth": { "type": "bearer", "env": "MY_SERVER_API_KEY" },
+  "auth": {
+    "type": "bearer",
+    "env": "MY_SERVER_API_KEY"
+  },
   "context": "One or two sentences on what the product does, as the agent should know it before it starts. Leave the verdict out.",
   "rules": [
     "Prefix the name or title of everything you create with \"mcp-test-\".",
     "Keep content small: a few short sentences per text."
   ],
-  "limits": { "a_tool_that_costs_money": 10, "a_tool_that_imports_a_website": 1 },
-  "ownership": { "alsoRecord": { "an_ask_tool": "^(conv|msg)_" } },
+  "limits": {
+    "a_tool_that_costs_money": 10,
+    "a_tool_that_imports_a_website": 1
+  },
+  "ownership": {
+    "alsoRecord": {
+      "an_ask_tool": "^(conv|msg)_"
+    }
+  },
   "cleanup": {
     "prefix": "mcp-test-",
     "steps": [
-      { "list": "list_things", "delete": "delete_thing", "idArg": "thing_id", "nameField": "name" }
+      {
+        "list": "list_things",
+        "delete": "delete_thing",
+        "idArg": "thing_id",
+        "nameField": "name"
+      }
     ]
   }
 }

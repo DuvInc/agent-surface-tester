@@ -1,0 +1,37 @@
+{
+  "name": "My REST API",
+  "surface": "api",
+  "auth": {
+    "type": "bearer",
+    "env": "MY_API_KEY"
+  },
+  "context": "One or two sentences on what the product does.",
+  "rules": [
+    "Prefix the name of everything you create with \"mcp-test-\"."
+  ],
+  "api": {
+    "baseUrl": "https://api.example.com",
+    "docsHosts": [
+      "api.example.com",
+      "docs.example.com"
+    ],
+    "docs": [
+      "https://api.example.com/llms.txt",
+      "https://api.example.com/openapi.json"
+    ]
+  },
+  "limits": {
+    "^POST /v1/things/[^/]+/expensive$": 10
+  },
+  "ownership": {
+    "rules": [
+      {
+        "match": "^POST /v1/things$"
+      },
+      {
+        "match": "^POST /v1/things/[^/]+/expensive$",
+        "ids": "^(conv|msg)_"
+      }
+    ]
+  }
+}

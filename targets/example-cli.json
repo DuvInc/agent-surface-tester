@@ -1,0 +1,38 @@
+{
+  "name": "My CLI",
+  "surface": "cli",
+  "auth": {
+    "type": "bearer",
+    "env": "MY_CLI_KEY"
+  },
+  "context": "One or two sentences on what the product does.",
+  "rules": [
+    "Prefix the name of everything you create with \"mcp-test-\"."
+  ],
+  "cli": {
+    "command": [
+      "mycli"
+    ],
+    "name": "mycli",
+    "credentialEnv": "MYCLI_API_KEY",
+    "deny": [
+      "login",
+      "completion"
+    ]
+  },
+  "limits": {
+    "^expensive ": 10
+  },
+  "ownership": {
+    "readOnly": "^(list|get|show|status|--help|help)( |$)|( )(list|get|show)( |$)",
+    "rules": [
+      {
+        "match": "^things create"
+      },
+      {
+        "match": "^expensive ",
+        "ids": "^(conv|msg)_"
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parallel": 3,
+  "runs": [
+    { "target": "../targets/example.json", "mission": "../missions/first-use.md", "model": "openai/gpt-6-luna", "flex": true, "reasoning": "low", "maxCost": 0.02 },
+    { "target": "../targets/example.json", "mission": "../missions/full-tour.md", "model": "nvidia/nemotron-3-ultra-550b-a55b:free", "maxCost": 0.02 }
+  ]
+}
