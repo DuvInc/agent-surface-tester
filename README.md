@@ -31,17 +31,17 @@ One surface per run, on purpose. An agent that can use the MCP, the API and the 
 
 ## What it cost, measured
 
-Run against the MCP server of a SaaS with 48 tools, on 2026-11-01. Ten runs, 335 tool calls, $0.0123 in total.
+Run against a SaaS with three surfaces (48 MCP tools, 46 REST paths, 70 CLI commands), on 2026-11-01. 44 runs, 1,287 tool calls, $0.048 in total. Same full-tour mission on each surface with a small model on the flex tier:
 
-| Run | Model | Tool calls | Cost |
-| :--- | :--- | ---: | ---: |
-| Full tour, every tool it can reach | `openai/gpt-6-luna`, flex tier, low reasoning | 44, then 52 | $0.0034, $0.0044 |
-| First contact, small realistic job | same | 6 | $0.0020 |
-| A customer-style job, no tool names | same; and `nvidia/nemotron-3-ultra-550b-a55b:free` | 8; 9 | $0.0012; $0 |
-| Errors and edge cases | same | 14 | $0.0014 |
-| Full tour | `nvidia/nemotron-3-ultra-550b-a55b:free` (twice), `nvidia/nemotron-3.5-super-vl:free`, `cohere/north-mini-code:free` | 39 to 66 | $0 |
+| Surface | Tool calls | Measured coverage | Cost |
+| :--- | ---: | :--- | ---: |
+| MCP | 58 | 44 of 48 tools | $0.0066 |
+| REST API | 52 | 40 distinct operations | $0.0061 |
+| CLI | 29 | 27 distinct commands | $0.0020 |
 
-Two other free models failed before the first tool call (rate limit, access policy). That is normal for free tiers: run a mission on several models and expect some not to answer.
+The CLI costs a third because the model sees 3 tools, where the MCP surface hands it 48 tool schemas on every step. Free (`:free`) models cost nothing but are the least reliable part: 13 of 44 runs ended early on a provider error (a per-minute 429 when three runs share the key, "temporarily overloaded", an idle timeout). The report is still written, with the trace up to that point.
+
+What the comparison across surfaces found that no single surface showed: the same empty text returns a clear 400 on the REST API and a 500 `internal_error` on the MCP server.
 
 ## How it works
 
@@ -63,6 +63,7 @@ Decisions, and what was rejected:
 - **The harness enforces the rules, the prompt informs.** The first free model tested renamed and paused an object it had not created, in spite of "only change what you created" in its instructions. `lib/ownership.mjs` remembers the ids that creating operations returned and refuses any other call that changes an id it does not know. On HTTP and CLI the same guard reads the path and the arguments. The harness also adds the credential itself, so the model never sees it.
 - **One agent per workspace.** Two agents in the same workspace read each other's objects, rename them and delete them, and the feedback becomes about the collision. `lib/lock.mjs` refuses a second run on a credential that is already in use (a crashed run does not block anyone: a lock whose process is gone is taken over). To test three surfaces at once, give each its own workspace and its own key: `suite` runs them in parallel and queues runs that share a workspace.
 - **The CLI is isolated from the inside out.** Arguments are an array, so there is no shell, no pipe and no expansion. The environment is rebuilt from nothing: `PATH`, a fake `HOME` in the scratch folder, the credential in the one variable the tool reads. The working folder is a fresh temp folder, deleted at the end. Each call has a timeout and an output cap, and you can deny subcommands. That is a boundary against a confused model, not against a hostile one: for that, run the whole thing in a container.
+- **Clean workspace, every run.** A run starts and ends by deleting what carries the test prefix. Without it, agents found a previous agent's leftovers, could not tell whose they were, and refused to touch them.
 - **Cheap models, several of them.** A full tour is about 300k input tokens. On a small model on the flex tier that is half a cent. Free models cost nothing and add diversity. One model's opinion is a hypothesis; the same point from three models is a signal.
 - **No dependency, no cloud account.** The MCP client is 90 lines of `fetch`. It speaks the Streamable HTTP transport, reads JSON or Server-Sent Events answers, and does not need a session. Everything runs on your machine; it needs a model key and a credential for the product, nothing else.
 
@@ -110,7 +111,7 @@ If you use a coding agent, [skills/test-an-mcp-server](skills/test-an-mcp-server
 ## What this is not
 
 - **Not a test suite.** It finds what an agent finds confusing, not whether your server returns the right bytes. Keep your own tests.
-- **Not a benchmark.** Ten runs on one server say nothing about how models rank.
+- **Not a benchmark.** Forty-four runs on one product say nothing about how models rank.
 - **Not safe on real data.** The guard stops a mistaken model from changing what it did not create. It does not stop it from reading, and it does not make an admin key safe to hand over.
 - **Not OAuth, not browsers, not stdio servers.** Remote MCP servers over HTTP, REST over HTTPS and local command line tools, for now. No SDK surface yet.
 - **Not an attack tool.** The `boundaries` mission checks that refusals are clear. It does not try to get around anything.

@@ -13,7 +13,7 @@ import { acquireLock, lockKey } from "../lib/lock.mjs";
 const USAGE = `Usage:
   mcp-agent-tester tools    --target <target.json>
   mcp-agent-tester run      --target <target.json> --mission <mission.md> [--model <id>] [--flex] [--reasoning low]
-                            [--max-steps 40] [--max-cost 0.05] [--key-from-clipboard] [--wait-lock <seconds>] [--out reports]
+                            [--max-steps 40] [--max-cost 0.05] [--key-from-clipboard] [--wait-lock <seconds>] [--no-cleanup] [--out reports]
   mcp-agent-tester cleanup  --target <target.json> [--dry]
   mcp-agent-tester suite    --suite <suite.json> [--out reports]
 
@@ -27,7 +27,7 @@ const { values: o } = parseArgs({
     model: { type: "string", default: "openai/gpt-6-luna" },
     flex: { type: "boolean", default: false }, reasoning: { type: "string" },
     "max-steps": { type: "string", default: "40" }, "max-cost": { type: "string", default: "0.05" },
-    "key-from-clipboard": { type: "boolean", default: false }, dry: { type: "boolean", default: false },
+    "key-from-clipboard": { type: "boolean", default: false }, "no-cleanup": { type: "boolean", default: false }, dry: { type: "boolean", default: false },
     "wait-lock": { type: "string", default: "0" }, out: { type: "string", default: "reports" },
   },
 });
@@ -106,27 +106,36 @@ if (command === "tools") {
 
 const release = await acquireLock(lockKey(token), { waitSeconds: Number(o["wait-lock"]), label: `${basename(o.target)} ${o.mission ? basename(o.mission) : command}` });
 
-if (command === "cleanup") {
-  // Deletes what a run left behind: anything whose name starts with target.cleanup.prefix.
-  // Goes through an MCP endpoint (target.cleanup.url, or the target's own URL on an MCP target)
-  // with the same credential, so it works whichever surface the run used.
+/**
+ * Deletes what a run left behind: anything whose name starts with target.cleanup.prefix. It goes through
+ * an MCP endpoint (target.cleanup.url, or the target's own URL on an MCP target) with the same
+ * credential, so it works whichever surface the run used. A run starts and ends with it, so an agent
+ * never finds a previous agent's leftovers and cannot tell whose they are.
+ */
+async function cleanupWorkspace({ dry = false, quiet = false } = {}) {
   const { prefix, steps, url } = target.cleanup ?? {};
-  if (!prefix || !steps || !(url ?? target.url)) { console.error('The target needs a "cleanup" section (prefix, steps, and url unless it is an MCP target)'); process.exit(1); }
+  if (!prefix || !steps || !(url ?? target.url)) return false;
   const client = new McpClient({ url: url ?? target.url, headers });
   await client.connect();
   for (const step of steps) {
     const listed = JSON.parse((await client.callTool(step.list, {})).content[0].text);
     const rows = Array.isArray(listed) ? listed : listed.data ?? Object.values(listed).find(Array.isArray) ?? [];
     for (const row of rows.filter((r) => String(r[step.nameField] ?? "").startsWith(prefix))) {
-      if (o.dry) { console.log(`would call ${step.delete} on ${row.id} (${row[step.nameField]})`); continue; }
+      if (dry) { console.log(`would call ${step.delete} on ${row.id} (${row[step.nameField]})`); continue; }
       const r = await client.callTool(step.delete, { [step.idArg]: row.id });
-      console.log(`${r.isError ? "FAILED" : "deleted"} ${step.delete} ${row.id} (${row[step.nameField]})`);
+      if (!quiet || r.isError) console.log(`${r.isError ? "FAILED" : "deleted"} ${step.delete} ${row.id} (${row[step.nameField]})`);
     }
   }
+  return true;
+}
+
+if (command === "cleanup") {
+  if (!(await cleanupWorkspace({ dry: o.dry }))) { console.error('The target needs a "cleanup" section (prefix, steps, and url unless it is an MCP target)'); process.exit(1); }
   process.exit(0);
 }
 
 if (!o.mission) { console.error("--mission <file.md> is required"); process.exit(1); }
+if (!o["no-cleanup"]) await cleanupWorkspace({ quiet: true });
 const surface = await createSurface(target, { headers, credential: token });
 console.log(`${surface.label}: ${surface.info.name ?? target.name} ${surface.info.version ?? ""}, ${surface.tools.length} tools`);
 const mission = readFileSync(o.mission, "utf8");
@@ -137,7 +146,11 @@ try {
     surface, target, mission, model: o.model, flex: o.flex, reasoning: o.reasoning,
     maxSteps: Number(o["max-steps"]), maxCostUsd: Number(o["max-cost"]), log: console.log,
   });
-} finally { await surface.close(); release(); }
+} finally {
+  await surface.close();
+  if (!o["no-cleanup"]) await cleanupWorkspace({ quiet: true }).catch((e) => console.error(`cleanup failed: ${e.message}`));
+  release();
+}
 
 const slug = `${started.toISOString().slice(0, 19).replace(/[:T]/g, "-")}_${surface.kind}_${basename(o.mission, ".md")}_${o.model.replace(/[^a-z0-9.]+/gi, "-")}`;
 mkdirSync(o.out, { recursive: true });
