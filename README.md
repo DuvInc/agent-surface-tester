@@ -32,19 +32,22 @@ The report has a score out of 10, what worked, friction with a severity, missing
 
 One door per run, on purpose. An agent that can reach the MCP, the API, the CLI and the SDK at once mixes them and you learn about none. Run the same mission on each door to see where agents sail through and where they guess wrong.
 
-## What it cost, measured
+## About the cost: what testing an agent surface costs
 
-Tested across 8 campaigns on a production SaaS (48 MCP tools, 46 REST paths, 70 CLI commands, 1 client SDK): **89 runs, $0.125 in total** on OpenRouter. Same full-tour mission on MCP, REST API and CLI with a small model on the flex tier:
+Automated agent testing is accessible enough to run before every release. On OpenRouter or compatible gateways, a comprehensive 20 to 50 step product tour typically costs between a fraction of a cent and a few pennies, depending on the model tier and the protocol.
 
-| Interface | Tool calls | Measured coverage | Cost |
-| :--- | ---: | :--- | ---: |
-| MCP | 58 | 44 of 48 tools | $0.0066 |
-| REST API | 52 | 40 distinct operations | $0.0061 |
-| CLI | 29 | 27 distinct commands | $0.0020 |
+| Model tier | Typical tour cost | Role in your testing loop |
+| :--- | :--- | :--- |
+| **Fast models on flex tiers** (e.g. Gemini Flash, GPT-6 Luna) | **$0.005 to $0.03** | Frequent sweeps, regression tests, catching raw documentation holes, missing payload examples, and unhandled 500 crashes. |
+| **Frontier reasoning models** (e.g. GPT-6.1 Terra, Claude Sonnet) | **$0.01 to $0.05** | Stress-testing complex boundary conditions (such as quantity limits or edge-case allergen policies), parallel calls, and clean-up verification. |
+| **Free community models** (`:free` suffix) | **$0.00** | Adding model diversity across open weights at zero cost. |
 
-The CLI costs a third because the model sees 3 tools, whereas the MCP server hands it 48 tool schemas on every step. Free (`:free`) models cost nothing and bring variety, though providers cut some runs short under rate limits or load; the harness still writes the report and the trace up to that step.
+Protocol differences also change the token economics:
 
-Comparing doors exposed bugs that no single door showed: sending empty text returned a clean 400 `invalid_parameter` on the REST API and a 500 `internal_error` on the MCP server. Four out of four API agents guessed `content` instead of `text` because `llms.txt` lacked a copyable request body. Five out of five hit a plan cap labelled `feature_not_available` instead of a quantity limit. Fixing those dropped errors on the local API tour from 9 to 0.
+- **MCP servers** hand the full tool schema catalogue to the agent on every turn. If your server exposes 40 or more tools, prompt tokens add up quickly.
+- **CLIs and REST APIs** give the agent a compact initial surface (3 basic harness tools) and let the agent query `--help` or `llms.txt` only when needed, often cutting token usage by half or more for the same task.
+
+Running the same mission across all doors surfaces discrepancies that unit tests cannot see: an empty input returning a clean 400 validation error on REST while triggering an unhandled 500 on MCP, an undocumented parameter name guessed wrong by multiple independent models, or a plan cap reported as an unavailable feature rather than a quantity limit.
 
 ## How it works
 
