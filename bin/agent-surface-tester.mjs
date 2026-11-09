@@ -13,7 +13,7 @@ import { acquireLock, lockKey } from "../lib/lock.mjs";
 const USAGE = `Usage:
   agent-surface-tester tools    --target <target.json>
   agent-surface-tester run      --target <target.json> --mission <mission.md> [--model <id>] [--flex] [--reasoning low]
-                                [--max-steps 40] [--max-cost 0.05] [--key-from-clipboard] [--wait-lock <seconds>] [--no-cleanup] [--out reports]
+                                [--max-steps 40] [--max-cost 0.05] [--max-prompt-tokens 90000] [--key-from-clipboard] [--wait-lock <seconds>] [--no-cleanup] [--out reports]
   agent-surface-tester cleanup  --target <target.json> [--dry]
   agent-surface-tester suite    --suite <suite.json> [--out reports]
 
@@ -26,7 +26,7 @@ const { values: o } = parseArgs({
     target: { type: "string" }, mission: { type: "string" }, suite: { type: "string" },
     model: { type: "string", default: "openai/gpt-6-luna" },
     flex: { type: "boolean", default: false }, reasoning: { type: "string" },
-    "max-steps": { type: "string", default: "40" }, "max-cost": { type: "string", default: "0.05" },
+    "max-steps": { type: "string", default: "40" }, "max-cost": { type: "string", default: "0.05" }, "max-prompt-tokens": { type: "string" },
     "key-from-clipboard": { type: "boolean", default: false }, "no-cleanup": { type: "boolean", default: false }, dry: { type: "boolean", default: false },
     "wait-lock": { type: "string", default: "0" }, out: { type: "string", default: "reports" },
   },
@@ -68,6 +68,7 @@ if (command === "suite") {
         "--max-cost", String(run.maxCost ?? 0.05), "--max-steps", String(run.maxSteps ?? 40), "--wait-lock", "1800", "--out", o.out];
       if (run.flex) args.push("--flex");
       if (run.reasoning) args.push("--reasoning", run.reasoning);
+      if (run.maxPromptTokens) args.push("--max-prompt-tokens", String(run.maxPromptTokens));
       const label = `#${run.id} ${basename(run.target, ".json")}/${basename(run.mission, ".md")}/${run.model}`;
       console.log(`start ${label}`);
       const output = await new Promise((done) => {
@@ -144,7 +145,7 @@ let result;
 try {
   result = await runAgent({
     surface, target, mission, model: o.model, flex: o.flex, reasoning: o.reasoning,
-    maxSteps: Number(o["max-steps"]), maxCostUsd: Number(o["max-cost"]), log: console.log,
+    maxSteps: Number(o["max-steps"]), maxCostUsd: Number(o["max-cost"]), maxPromptTokens: o["max-prompt-tokens"] ? Number(o["max-prompt-tokens"]) : Infinity, log: console.log,
   });
 } finally {
   await surface.close();
@@ -163,7 +164,7 @@ writeFileSync(`${o.out}/${slug}.md`, `# ${target.name ?? target.url ?? "target"}
 
 - Mission: \`${o.mission}\`  ·  Date: ${started.toISOString()}
 - Stopped by: **${result.stoppedBy}**  ·  Steps: ${result.totals.steps}  ·  Tool calls: ${result.totals.toolCalls}  ·  Measured coverage: ${coverageLine}
-- Tokens: ${result.totals.promptTokens} in / ${result.totals.completionTokens} out  ·  Tier: ${result.totals.tiers.join(", ")}
+- Tokens: ${result.totals.promptTokens} in (${result.totals.cachedTokens} from cache) / ${result.totals.completionTokens} out  ·  Tier: ${result.totals.tiers.join(", ")}
 - **Cost: $${result.totals.cost.toFixed(5)}**
 
 > One agent's opinion. Input for a decision, not a directive: another model may say the opposite.
