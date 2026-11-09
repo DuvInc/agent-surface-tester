@@ -43,6 +43,7 @@ node --check bin/agent-surface-tester.mjs
 ## Things that bite
 
 - **A gateway can answer HTTP 200 with an error in the body.** `lib/openrouter.mjs` checks `json.error`.
+- **A BYOK call reports `usage.cost: 0`.** With the provider's own key on OpenRouter, the bill is in `usage.cost_details.upstream_inference_cost`; `usageCost` in `lib/openrouter.mjs` reads it. Reading only `usage.cost` once let a run go 50 steps past its `--max-cost`.
 - **Flex can fail with a capacity error.** The first attempt asks for flex, the retry does not. `:free` models never use flex.
 - **Free models are flaky**: 429, 403, "temporarily overloaded" mid-run. `runAgent` catches a model error, stops cleanly and still writes the report.
 - **An ask tool returns ids it does not own** (citations point at other objects). The target's `ownership.alsoRecord` limits which ids a tool may hand to the agent.

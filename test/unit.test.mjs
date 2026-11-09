@@ -89,3 +89,38 @@ test("budget and step cutoffs identify the test harness so skipped cleanup is no
   assert.match(stepGw.requests.at(-1).messages.at(-1).content, /\[harness\] Session step cap reached/);
   stepGw.server.close();
 });
+
+test("resource-first tool names count as creating, and a given workspace id is the agent's", () => {
+  const guard = new OwnershipGuard({ owned: ["ste_suite12345"] });
+  const tool = (name) => ({ name, annotations: {} });
+  assert.equal(guard.check(tool("apps_create"), { suiteId: "ste_suite12345" }), null);
+  guard.record("apps_create", '{"id":"app_mine12345"}');
+  assert.equal(guard.check(tool("apps_update"), { appId: "app_mine12345" }), null);
+  assert.match(guard.check(tool("apps_delete"), { appId: "app_other1234" }), /did not create/);
+  guard.record("apps_list", '{"id":"app_other1234"}');
+  assert.match(guard.check(tool("apps_delete"), { appId: "app_other1234" }), /did not create/, "a list does not hand ownership");
+});
+
+test("a BYOK call costs what the provider billed, not OpenRouter's zero fee", async () => {
+  const { usageCost } = await import("../lib/openrouter.mjs");
+  assert.equal(usageCost({ cost: 0, is_byok: true, cost_details: { upstream_inference_cost: 0.0042 } }), 0.0042);
+  assert.equal(usageCost({ cost: 0.003, cost_details: { upstream_inference_cost: 0.003 } }), 0.003, "not counted twice without BYOK");
+  assert.equal(usageCost(undefined), 0);
+});
+
+test("an api target with no ownership rules owns what its POSTs created", async () => {
+  const { createApiSurface } = await import("../lib/surfaces/api.mjs");
+  const surface = createApiSurface({ api: { baseUrl: "https://api.example.com" } });
+  const patch = { method: "PATCH", path: "/v1/apps/app_mine12345" };
+  assert.match(surface.check("http_request", patch), /did not create/);
+  surface.record("http_request", { method: "POST", path: "/v1/apps" }, 'HTTP 201\n{"data":{"id":"app_mine12345"}}');
+  assert.equal(surface.check("http_request", patch), null);
+  surface.record("http_request", { method: "PATCH", path: "/v1/apps/app_mine12345" }, '{"id":"app_other1234"}');
+  assert.match(surface.check("http_request", { method: "DELETE", path: "/v1/apps/app_other1234" }), /did not create/, "only a POST hands ownership");
+});
+
+test("a target can say a snake_case word is not an id", () => {
+  const guard = new OwnershipGuard({ idPattern: "^[a-z]{2,5}_(?=[a-z0-9]*\\d)[a-z0-9]{8,}$" });
+  assert.equal(guard.check({ name: "apps_create", annotations: {} }, { status: "in_progress", stage: "not_started" }), null);
+  assert.match(guard.check({ name: "apps_delete", annotations: {} }, { appId: "app_5ewb65rnu7km" }), /did not create/);
+});

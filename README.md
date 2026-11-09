@@ -42,6 +42,11 @@ Automated agent testing is accessible enough to run before every release. On Ope
 | **Frontier reasoning models** (e.g. GPT-6.1 Terra, Claude Sonnet) | **$0.01 to $0.05** | Stress-testing complex boundary conditions (such as quantity limits or edge-case allergen policies), parallel calls, and clean-up verification. |
 | **Free community models** (`:free` suffix) | **$0.00** | Adding model diversity across open weights at zero cost. |
 
+Two things decide the real bill more than the model's list price:
+
+- **Prompt caching.** Most providers cache the repeated prefix on their own. Anthropic models only cache when asked, so the harness marks the system prompt and the newest message for them (`lib/cache.mjs`); without it, every step of a long run paid full price for the whole transcript.
+- **Context-size pricing.** Some models charge more per token past a size (Claude Haiku 5.5: five times more above 100k prompt tokens). The transcript only grows, so cap it with `--max-prompt-tokens`.
+
 Protocol differences also change the token economics:
 
 - **MCP servers** hand the full tool schema catalogue to the agent on every turn. If your server exposes 40 or more tools, prompt tokens add up quickly.

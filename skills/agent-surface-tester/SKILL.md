@@ -29,12 +29,17 @@ This file is the procedure.
    tests against a workspace holding real customer data.
 5. **One agent per interface, one agent per workspace.** An agent given the MCP, the API, the CLI and the SDK mixes them. Two agents in one workspace collide. The harness locks on the credential; you provide one sandbox workspace and one key per interface you want to run at the same time.
 6. **Cap everything.** `--max-cost`, `--max-steps`, and `limits` per operation in the target for
-   anything that spends money or imports from the internet.
+   anything that spends money or imports from the internet. Add `--max-prompt-tokens` when the
+   model charges more past a context size (Claude Haiku 5.5: five times the price above 100k
+   prompt tokens); a large MCP catalogue gets there in a few steps, since it is resent every step.
+7. **Measure before you trust the bill.** Run one short probe (`--max-steps 4`) and read the
+   report's tokens and cost before a campaign. With a provider key of your own on OpenRouter
+   (BYOK), the cost is read from `cost_details.upstream_inference_cost`; check it is not zero.
 
 ## Steps
 
 1. **Sandbox workspaces.** Ask the human for one empty workspace (account, project) per interface to test in parallel, each with a key made for the test, narrow scopes and enough credit for about ten paid operations (or spin up a local disposable instance of the product if the codebase supports it). Creating production accounts is a human step: do not sign up on a person's behalf. Never test against a workspace with real data or one other agents work in.
-2. **Write the target files**, one per interface, from `targets/example*.json`: `surface`, `auth`, a `context` sentence, `rules`, `limits` for everything that costs money, `ownership` rules (which operations create things), `cleanup`.
+2. **Write the target files**, one per interface, from `targets/example*.json`: `surface`, `auth`, a `context` sentence, `rules`, `limits` for everything that costs money, `ownership` rules (which operations create things), `cleanup`. `ownership.owned` lists the ids of the workspace itself (organisation, suite, project) so the agent may create inside it; `ownership.idPattern` narrows what counts as an id (when option values such as `in_progress` look like one); `ownership.creating` is a regex over MCP tool names when they do not start or end with `create`, `add`, `duplicate`, `import` or `upload`. On a REST target with no rules, ids returned by a POST are the agent's. A workspace that is disposable as a whole (seeded only for the test, one agent) can set `"onlyTouchOwn": false`.
 3. **List the tools** (`tools`). Mark which ones spend money or delete. Decide the limits. For a CLI, read `--help` yourself first to write `ownership.readOnly` and the creating commands; for an SDK, point `sdk.docs` at its `README.md` and `.d.ts` files.
 4. **Plumbing check without a model**: one read-only call per interface (account, credits). Cheap, and it catches a wrong URL, path or scope before a run spends anything.
 5. **First run: `missions/first-use.md`** with the cheapest model. It finds blockers fast.
